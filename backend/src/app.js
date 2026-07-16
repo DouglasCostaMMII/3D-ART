@@ -5,9 +5,7 @@ const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
-
-// Initialize database on startup
-require('./db/database');
+const { initializeDatabase } = require('./db/database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -60,9 +58,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: 'Erro interno do servidor.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`3D Studio API running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-});
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`3D Studio API running on port ${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  });
 
 module.exports = app;

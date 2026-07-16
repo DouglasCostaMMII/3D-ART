@@ -2,26 +2,19 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { db } = require('../db/database');
+const { pool } = require('../db/database');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../../uploads'));
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  },
+  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads')),
+  filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
 });
 
 const fileFilter = (req, file, cb) => {
   const allowed = /jpeg|jpg|png|gif|webp/;
-  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mime = allowed.test(file.mimetype);
-  if (ext && mime) {
+  if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('Apenas imagens são permitidas.'));
@@ -30,27 +23,23 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, fileFilter, limits: { files: 5, fileSize: 10 * 1024 * 1024 } });
 
-function getProductWithDetails(id) {
-  const product = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-  if (!product) return null;
-
-  const images = db.prepare('SELECT * FROM product_images WHERE product_id = ?').all(id);
-  const variations = db.prepare('SELECT * FROM product_variations WHERE product_id = ?').all(id);
-
-  return { ...product, images, variations };
+async function getProductWithDetails(id) {
+  const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+  if (!rows[0]) return null;
+  const images = (await pool.query('SELECT * FROM product_images WHERE product_id = $1', [id])).rows;
+  const variations = (await pool.query('SELECT * FROM product_variations WHERE product_id = $1', [id])).rows;
+  return { ...rows[0], images, variations };
 }
 
-// GET /api/products - list all active products
-router.get('/', (req, res) => {
+// GET /api/products - public
+router.get('/', async (req, res) => {
   try {
-    const products = db.prepare('SELECT * FROM products WHERE active = 1 ORDER BY created_at DESC').all();
-
-    const result = products.map((product) => {
-      const images = db.prepare('SELECT * FROM product_images WHERE product_id = ?').all(product.id);
-      const variations = db.prepare('SELECT * FROM product_variations WHERE product_id = ?').all(product.id);
-      return { ...product, images, variations };
-    });
-
+    const { rows: products } = await pool.query('SELECT * FROM products WHERE active = 1 ORDER BY created_at DESC');
+    const result = await Promise.all(products.map(async (p) => {
+      const images = (await pool.query('SELECT * FROM product_images WHERE product_id = $1', [p.id])).rows;
+      const variations = (await pool.query('SELECT * FROM product_variations WHERE product_id = $1', [p.id])).rows;
+      return { ...p, images, variations };
+    }));
     res.json({ success: true, products: result });
   } catch (err) {
     console.error(err);
@@ -58,17 +47,15 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET /api/products/all - list ALL products (admin use)
-router.get('/all', authMiddleware, (req, res) => {
+// GET /api/products/all - admin
+router.get('/all', authMiddleware, async (req, res) => {
   try {
-    const products = db.prepare('SELECT * FROM products ORDER BY created_at DESC').all();
-
-    const result = products.map((product) => {
-      const images = db.prepare('SELECT * FROM product_images WHERE product_id = ?').all(product.id);
-      const variations = db.prepare('SELECT * FROM product_variations WHERE product_id = ?').all(product.id);
-      return { ...product, images, variations };
-    });
-
+    const { rows: products } = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
+    const result = await Promise.all(products.map(async (p) => {
+      const images = (await pool.query('SELECT * FROM product_images WHERE product_id = $1', [p.id])).rows;
+      const variations = (await pool.query('SELECT * FROM product_variations WHERE product_id = $1', [p.id])).rows;
+      return { ...p, images, variations };
+    }));
     res.json({ success: true, products: result });
   } catch (err) {
     console.error(err);
@@ -76,13 +63,11 @@ router.get('/all', authMiddleware, (req, res) => {
   }
 });
 
-// GET /api/products/:id - get single product
-router.get('/:id', (req, res) => {
+// GET /api/products/:id
+router.get('/:id', async (req, res) => {
   try {
-    const product = getProductWithDetails(req.params.id);
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
-    }
+    const product = await getProductWithDetails(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
     res.json({ success: true, product });
   } catch (err) {
     console.error(err);
@@ -90,33 +75,28 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// POST /api/products - create product
-router.post('/', authMiddleware, (req, res) => {
+// POST /api/products
+router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, description, price, category, active = 1, stock = 1, variations = [] } = req.body;
-
     if (!name || price === undefined) {
       return res.status(400).json({ success: false, message: 'Nome e preço são obrigatórios.' });
     }
-
     const id = uuidv4();
-
-    db.prepare(`
-      INSERT INTO products (id, name, description, price, category, active, stock)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, name, description || '', parseFloat(price), category || 'Outro', active ? 1 : 0, parseInt(stock) || 1);
-
-    const parsedVariations = typeof variations === 'string' ? JSON.parse(variations) : variations;
-    const insertVariation = db.prepare(
-      'INSERT INTO product_variations (id, product_id, type, value) VALUES (?, ?, ?, ?)'
+    await pool.query(
+      `INSERT INTO products (id, name, description, price, category, active, stock) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, name, description || '', parseFloat(price), category || 'Outro', active ? 1 : 0, parseInt(stock) || 1]
     );
+    const parsedVariations = typeof variations === 'string' ? JSON.parse(variations) : variations;
     for (const v of parsedVariations) {
       if (v.type && v.value) {
-        insertVariation.run(uuidv4(), id, v.type, v.value);
+        await pool.query(
+          `INSERT INTO product_variations (id, product_id, type, value) VALUES ($1,$2,$3,$4)`,
+          [uuidv4(), id, v.type, v.value]
+        );
       }
     }
-
-    const product = getProductWithDetails(id);
+    const product = await getProductWithDetails(id);
     res.status(201).json({ success: true, product });
   } catch (err) {
     console.error(err);
@@ -124,45 +104,39 @@ router.post('/', authMiddleware, (req, res) => {
   }
 });
 
-// PUT /api/products/:id - update product
-router.put('/:id', authMiddleware, (req, res) => {
+// PUT /api/products/:id
+router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
-    }
-
+    const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
+    const existing = rows[0];
     const { name, description, price, category, active, stock, variations } = req.body;
-
-    db.prepare(`
-      UPDATE products
-      SET name = ?, description = ?, price = ?, category = ?, active = ?, stock = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      name ?? existing.name,
-      description ?? existing.description,
-      price !== undefined ? parseFloat(price) : existing.price,
-      category ?? existing.category,
-      active !== undefined ? (active ? 1 : 0) : existing.active,
-      stock !== undefined ? parseInt(stock) : existing.stock,
-      id
+    await pool.query(
+      `UPDATE products SET name=$1, description=$2, price=$3, category=$4, active=$5, stock=$6, updated_at=NOW() WHERE id=$7`,
+      [
+        name ?? existing.name,
+        description ?? existing.description,
+        price !== undefined ? parseFloat(price) : existing.price,
+        category ?? existing.category,
+        active !== undefined ? (active ? 1 : 0) : existing.active,
+        stock !== undefined ? parseInt(stock) : existing.stock,
+        id,
+      ]
     );
-
     if (variations !== undefined) {
-      const parsedVariations = typeof variations === 'string' ? JSON.parse(variations) : variations;
-      db.prepare('DELETE FROM product_variations WHERE product_id = ?').run(id);
-      const insertVariation = db.prepare(
-        'INSERT INTO product_variations (id, product_id, type, value) VALUES (?, ?, ?, ?)'
-      );
-      for (const v of parsedVariations) {
+      const parsed = typeof variations === 'string' ? JSON.parse(variations) : variations;
+      await pool.query('DELETE FROM product_variations WHERE product_id = $1', [id]);
+      for (const v of parsed) {
         if (v.type && v.value) {
-          insertVariation.run(uuidv4(), id, v.type, v.value);
+          await pool.query(
+            `INSERT INTO product_variations (id, product_id, type, value) VALUES ($1,$2,$3,$4)`,
+            [uuidv4(), id, v.type, v.value]
+          );
         }
       }
     }
-
-    const product = getProductWithDetails(id);
+    const product = await getProductWithDetails(id);
     res.json({ success: true, product });
   } catch (err) {
     console.error(err);
@@ -170,16 +144,13 @@ router.put('/:id', authMiddleware, (req, res) => {
   }
 });
 
-// DELETE /api/products/:id - soft delete
-router.delete('/:id', authMiddleware, (req, res) => {
+// DELETE /api/products/:id (soft delete)
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
-    }
-
-    db.prepare("UPDATE products SET active = 0, updated_at = datetime('now') WHERE id = ?").run(id);
+    const { rows } = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
+    await pool.query('UPDATE products SET active = 0, updated_at = NOW() WHERE id = $1', [id]);
     res.json({ success: true, message: 'Produto removido com sucesso.' });
   } catch (err) {
     console.error(err);
@@ -188,52 +159,42 @@ router.delete('/:id', authMiddleware, (req, res) => {
 });
 
 // PUT /api/products/:id/toggle-active
-router.put('/:id/toggle-active', authMiddleware, (req, res) => {
+router.put('/:id/toggle-active', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
-    }
-
-    const newActive = existing.active === 1 ? 0 : 1;
-    db.prepare("UPDATE products SET active = ?, updated_at = datetime('now') WHERE id = ?").run(newActive, id);
-
-    const product = getProductWithDetails(id);
+    const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
+    const newActive = rows[0].active === 1 ? 0 : 1;
+    await pool.query('UPDATE products SET active = $1, updated_at = NOW() WHERE id = $2', [newActive, id]);
+    const product = await getProductWithDetails(id);
     res.json({ success: true, product });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: 'Erro ao alternar status do produto.' });
+    res.status(500).json({ success: false, message: 'Erro ao alternar status.' });
   }
 });
 
-// POST /api/products/:id/images - upload images
-router.post('/:id/images', authMiddleware, upload.array('images', 5), (req, res) => {
+// POST /api/products/:id/images
+router.post('/:id/images', authMiddleware, upload.array('images', 5), async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
-    }
-
+    const { rows } = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada.' });
     }
-
-    const existingImages = db.prepare('SELECT COUNT(*) as cnt FROM product_images WHERE product_id = ?').get(id);
-    const insertImage = db.prepare(
-      'INSERT INTO product_images (id, product_id, url, is_primary) VALUES (?, ?, ?, ?)'
-    );
-
+    const { rows: existing } = await pool.query('SELECT COUNT(*) as cnt FROM product_images WHERE product_id = $1', [id]);
     const newImages = [];
-    req.files.forEach((file, index) => {
+    for (const [index, file] of req.files.entries()) {
       const imageId = uuidv4();
       const url = `/uploads/${file.filename}`;
-      const isPrimary = existingImages.cnt === 0 && index === 0 ? 1 : 0;
-      insertImage.run(imageId, id, url, isPrimary);
+      const isPrimary = parseInt(existing[0].cnt) === 0 && index === 0 ? 1 : 0;
+      await pool.query(
+        `INSERT INTO product_images (id, product_id, url, is_primary) VALUES ($1,$2,$3,$4)`,
+        [imageId, id, url, isPrimary]
+      );
       newImages.push({ id: imageId, product_id: id, url, is_primary: isPrimary });
-    });
-
+    }
     res.json({ success: true, images: newImages });
   } catch (err) {
     console.error(err);
@@ -242,24 +203,19 @@ router.post('/:id/images', authMiddleware, upload.array('images', 5), (req, res)
 });
 
 // DELETE /api/products/:id/images/:imageId
-router.delete('/:id/images/:imageId', authMiddleware, (req, res) => {
+router.delete('/:id/images/:imageId', authMiddleware, async (req, res) => {
   try {
     const { id, imageId } = req.params;
-    const image = db.prepare('SELECT * FROM product_images WHERE id = ? AND product_id = ?').get(imageId, id);
-    if (!image) {
-      return res.status(404).json({ success: false, message: 'Imagem não encontrada.' });
-    }
-
-    db.prepare('DELETE FROM product_images WHERE id = ?').run(imageId);
-
-    if (image.is_primary) {
-      const firstImage = db.prepare('SELECT * FROM product_images WHERE product_id = ? LIMIT 1').get(id);
-      if (firstImage) {
-        db.prepare('UPDATE product_images SET is_primary = 1 WHERE id = ?').run(firstImage.id);
+    const { rows } = await pool.query('SELECT * FROM product_images WHERE id = $1 AND product_id = $2', [imageId, id]);
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Imagem não encontrada.' });
+    await pool.query('DELETE FROM product_images WHERE id = $1', [imageId]);
+    if (rows[0].is_primary === 1) {
+      const { rows: first } = await pool.query('SELECT id FROM product_images WHERE product_id = $1 LIMIT 1', [id]);
+      if (first[0]) {
+        await pool.query('UPDATE product_images SET is_primary = 1 WHERE id = $1', [first[0].id]);
       }
     }
-
-    res.json({ success: true, message: 'Imagem removida com sucesso.' });
+    res.json({ success: true, message: 'Imagem removida.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Erro ao remover imagem.' });
