@@ -22,7 +22,7 @@ export default function ProductCarousel() {
   const trackRef = useRef(null)
   const intervalRef = useRef(null)
   const startXRef = useRef(null)
-  const { addItem, openCart } = useCart()
+  const { addItem } = useCart()
 
   useEffect(() => {
     fetch(`${API_URL}/api/products`)
@@ -88,7 +88,6 @@ export default function ProductCarousel() {
     addItem(product, firstVariation)
     setAdded(product.id)
     setTimeout(() => setAdded(null), 1500)
-    openCart()
   }
 
   if (products.length === 0) return null
@@ -187,16 +186,7 @@ export default function ProductCarousel() {
                           : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                       }`}
                     >
-                      {added === product.id ? (
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
-                      )}
-                      {added === product.id ? 'OK' : '+'}
+                      {added === product.id ? '✓' : '+'}
                     </button>
                   </div>
                 </div>

@@ -23,7 +23,6 @@ export function CartProvider({ children }) {
       }
       return [...prev, { product, variation, quantity: 1 }]
     })
-    setIsOpen(true)
   }
 
   function removeItem(productId, variation) {
