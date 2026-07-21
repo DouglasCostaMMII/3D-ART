@@ -104,7 +104,7 @@ export default function ProductForm({ product, onClose, onSaved }) {
         throw new Error('Nome e preço são obrigatórios.')
       }
 
-      const url = isEdit ? `/api/products/${product.id}` : '/api/products'
+      const url = isEdit ? `${API_URL}/api/products/${product.id}` : `${API_URL}/api/products`
       const method = isEdit ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
