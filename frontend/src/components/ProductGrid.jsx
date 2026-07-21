@@ -1,6 +1,7 @@
 import { API_URL } from '../lib/api'
 import { useState, useEffect, useMemo } from 'react'
 import ProductCard from './ProductCard'
+import { products, productGrid } from '../config/content'
 
 function SkeletonCard() {
   return (
@@ -17,14 +18,12 @@ function SkeletonCard() {
   )
 }
 
-const CATEGORIES = ['Todos', 'Decoração', 'Utilidades', 'Arte', 'Educação', 'Outro']
-
 export default function ProductGrid() {
-  const [products, setProducts] = useState([])
+  const [productList, setProductList] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState('Todos')
+  const [activeCategory, setActiveCategory] = useState(products.categories[0])
 
   useEffect(() => {
     fetchProducts()
@@ -35,9 +34,9 @@ export default function ProductGrid() {
     setError(null)
     try {
       const res = await fetch(`${API_URL}/api/products`)
-      if (!res.ok) throw new Error('Falha ao carregar produtos.')
+      if (!res.ok) throw new Error(productGrid.loadError)
       const data = await res.json()
-      setProducts(data.products || [])
+      setProductList(data.products || [])
     } catch (err) {
       setError(err.message || 'Erro ao carregar produtos.')
     } finally {
@@ -46,15 +45,15 @@ export default function ProductGrid() {
   }
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    return productList.filter((p) => {
       const matchesSearch =
         !search ||
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         (p.description && p.description.toLowerCase().includes(search.toLowerCase()))
-      const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory
+      const matchesCategory = activeCategory === products.categories[0] || p.category === activeCategory
       return matchesSearch && matchesCategory
     })
-  }, [products, search, activeCategory])
+  }, [productList, search, activeCategory])
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -81,14 +80,14 @@ export default function ProductGrid() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar produtos..."
+            placeholder={productGrid.searchPlaceholder}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-sm bg-white shadow-sm"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
               className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
-              aria-label="Limpar busca"
+              aria-label={productGrid.clearSearch}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -99,7 +98,7 @@ export default function ProductGrid() {
 
         {/* Category pills */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {CATEGORIES.map((cat) => (
+          {products.categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
@@ -119,7 +118,7 @@ export default function ProductGrid() {
       {!loading && !error && (
         <p className="text-sm text-gray-400 mb-4">
           {filteredProducts.length === 0
-            ? 'Nenhum produto encontrado.'
+            ? productGrid.notFound + '.'
             : `${filteredProducts.length} produto${filteredProducts.length !== 1 ? 's' : ''} encontrado${filteredProducts.length !== 1 ? 's' : ''}`}
         </p>
       )}
@@ -133,7 +132,7 @@ export default function ProductGrid() {
             onClick={fetchProducts}
             className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
           >
-            Tentar novamente
+            {productGrid.retryButton}
           </button>
         </div>
       )}
@@ -143,8 +142,8 @@ export default function ProductGrid() {
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-            : filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+            : filteredProducts.map((p) => (
+                <ProductCard key={p.id} product={p} />
               ))}
         </div>
       )}
@@ -153,15 +152,15 @@ export default function ProductGrid() {
       {!loading && !error && filteredProducts.length === 0 && (
         <div className="text-center py-16">
           <div className="text-5xl mb-4">🔍</div>
-          <p className="text-gray-500 text-lg font-medium">Nenhum produto encontrado</p>
+          <p className="text-gray-500 text-lg font-medium">{productGrid.notFound}</p>
           <p className="text-gray-400 text-sm mt-1">
-            Tente ajustar sua busca ou selecionar outra categoria.
+            {productGrid.notFoundHint}
           </p>
           <button
-            onClick={() => { setSearch(''); setActiveCategory('Todos') }}
+            onClick={() => { setSearch(''); setActiveCategory(products.categories[0]) }}
             className="mt-4 text-indigo-600 font-medium hover:underline text-sm"
           >
-            Limpar filtros
+            {productGrid.clearFilters}
           </button>
         </div>
       )}

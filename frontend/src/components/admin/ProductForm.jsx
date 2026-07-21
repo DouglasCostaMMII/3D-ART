@@ -1,18 +1,15 @@
 import { API_URL } from '../../lib/api'
 import { useState, useEffect } from 'react'
+import { admin } from '../../config/content'
 
-const CATEGORIES = ['Decoração', 'Utilidades', 'Arte', 'Educação', 'Outro']
-const VARIATION_TYPES = [
-  { value: 'cor', label: 'Cor' },
-  { value: 'tamanho', label: 'Tamanho' },
-  { value: 'material', label: 'Material' },
-]
+const CATEGORIES = admin.categories
+const VARIATION_TYPES = admin.variationTypes
 
 function formatPrice(price) {
   return `R$ ${price.toFixed(2).replace('.', ',')}`
 }
 
-export default function ProductForm({ product, onClose, onSaved, token }) {
+export default function ProductForm({ product, onClose, onSaved }) {
   const isEdit = !!product
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -78,7 +75,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
     try {
       const res = await fetch(`${API_URL}/api/products/${productId}/images/${imageId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!res.ok) throw new Error('Falha ao remover imagem.')
       setExistingImages((prev) => prev.filter((img) => img.id !== imageId))
@@ -112,10 +109,8 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
 
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(body),
       })
 
@@ -131,12 +126,13 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
 
         const imgRes = await fetch(`${API_URL}/api/products/${savedProduct.id}/images`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
           body: formData,
         })
 
         if (!imgRes.ok) {
-          console.warn('Produto salvo mas falha ao enviar imagens.')
+          const imgData = await imgRes.json().catch(() => ({}))
+          throw new Error(imgData.message || 'Produto salvo, mas falha ao enviar imagens. Tente novamente.')
         }
       }
 
@@ -154,7 +150,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
         {/* Modal header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">
-            {isEdit ? 'Editar Produto' : 'Novo Produto'}
+            {isEdit ? admin.productForm.titleEdit : admin.productForm.titleCreate}
           </h2>
           <button
             onClick={onClose}
@@ -177,27 +173,27 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Nome <span className="text-red-500">*</span>
+              {admin.productForm.nameLabel} <span className="text-red-500">*</span>
             </label>
             <input
               name="name"
               value={form.name}
               onChange={handleChange}
               required
-              placeholder="Nome do produto"
+              placeholder={admin.productForm.namePlaceholder}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Descrição</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{admin.productForm.descriptionLabel}</label>
             <textarea
               name="description"
               value={form.description}
               onChange={handleChange}
               rows={3}
-              placeholder="Descrição do produto..."
+              placeholder={admin.productForm.descriptionPlaceholder}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent resize-none"
             />
           </div>
@@ -206,7 +202,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Preço (R$) <span className="text-red-500">*</span>
+                {admin.productForm.priceLabel} <span className="text-red-500">*</span>
               </label>
               <input
                 name="price"
@@ -216,12 +212,12 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                 value={form.price}
                 onChange={handleChange}
                 required
-                placeholder="0,00"
+                placeholder={admin.productForm.priceLabel}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Categoria</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{admin.productForm.categoryLabel}</label>
               <select
                 name="category"
                 value={form.category}
@@ -238,7 +234,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
           {/* Stock + Active */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Estoque</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{admin.productForm.stockLabel}</label>
               <input
                 name="stock"
                 type="number"
@@ -272,7 +268,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                   </div>
                 </div>
                 <span className="text-sm font-medium text-gray-700">
-                  {form.active ? 'Ativo' : 'Inativo'}
+                  {form.active ? admin.productForm.activeLabel : admin.productForm.inactiveLabel}
                 </span>
               </label>
             </div>
@@ -281,7 +277,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
           {/* Variations */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Variações</label>
+              <label className="text-sm font-medium text-gray-700">{admin.productForm.variationsLabel}</label>
               <button
                 type="button"
                 onClick={addVariation}
@@ -290,7 +286,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                Adicionar variação
+                {admin.productForm.addVariation}
               </button>
             </div>
             <div className="space-y-2">
@@ -308,7 +304,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                   <input
                     value={v.value}
                     onChange={(e) => updateVariation(i, 'value', e.target.value)}
-                    placeholder="Ex: Azul, P, PLA..."
+                    placeholder={admin.productForm.variationPlaceholder}
                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
                   <button
@@ -331,7 +327,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
 
           {/* Images */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Imagens</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{admin.productForm.imagesLabel}</label>
 
             {/* Existing images */}
             {existingImages.length > 0 && (
@@ -346,7 +342,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                     />
                     {img.is_primary === 1 && (
                       <span className="absolute top-0.5 left-0.5 bg-indigo-600 text-white text-xs px-1 rounded text-[9px]">
-                        Principal
+                        {admin.productForm.primaryBadge}
                       </span>
                     )}
                     {isEdit && (
@@ -387,7 +383,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                       </svg>
                     </button>
                     <span className="absolute bottom-0.5 left-0 right-0 text-center text-white text-[9px] bg-indigo-600/80 rounded-b-lg">
-                      Nova
+                      {admin.productForm.newBadge}
                     </span>
                   </div>
                 ))}
@@ -400,7 +396,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
               <span className="text-sm text-gray-500">
-                Clique para selecionar imagens (máx. 5)
+                {admin.productForm.uploadHint}
               </span>
               <input
                 type="file"
@@ -419,7 +415,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
               onClick={onClose}
               className="flex-1 border border-gray-200 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors text-sm"
             >
-              Cancelar
+              {admin.productForm.cancelButton}
             </button>
             <button
               type="submit"
@@ -432,7 +428,7 @@ export default function ProductForm({ product, onClose, onSaved, token }) {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              {loading ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Criar Produto'}
+              {loading ? admin.productForm.savingButton : isEdit ? admin.productForm.saveButton : admin.productForm.createButton}
             </button>
           </div>
         </form>

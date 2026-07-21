@@ -1,6 +1,7 @@
 import { API_URL } from '../../lib/api'
 import { useState, useEffect } from 'react'
 import ProductForm from './ProductForm'
+import { admin } from '../../config/content'
 
 function formatPrice(price) {
   return `R$ ${price.toFixed(2).replace('.', ',')}`
@@ -10,25 +11,25 @@ function StatusBadge({ product }) {
   if (product.stock === 0) {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-        Esgotado
+        {admin.productList.statusOutOfStock}
       </span>
     )
   }
   if (product.active) {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-        Ativo
+        {admin.productList.statusActive}
       </span>
     )
   }
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-      Inativo
+      {admin.productList.statusInactive}
     </span>
   )
 }
 
-export default function ProductList({ token }) {
+export default function ProductList() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -46,7 +47,7 @@ export default function ProductList({ token }) {
     setError(null)
     try {
       const res = await fetch(`${API_URL}/api/products/all`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!res.ok) throw new Error('Falha ao carregar produtos.')
       const data = await res.json()
@@ -59,12 +60,12 @@ export default function ProductList({ token }) {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Tem certeza que deseja remover este produto?')) return
+    if (!window.confirm(admin.productList.confirmDelete)) return
     setDeletingId(id)
     try {
       const res = await fetch(`${API_URL}/api/products/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!res.ok) throw new Error('Falha ao remover produto.')
       setProducts((prev) => prev.filter((p) => p.id !== id))
@@ -80,7 +81,7 @@ export default function ProductList({ token }) {
     try {
       const res = await fetch(`${API_URL}/api/products/${id}/toggle-active`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!res.ok) throw new Error('Falha ao alternar status.')
       const data = await res.json()
@@ -142,19 +143,19 @@ export default function ProductList({ token }) {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
-          Novo Produto
+          {admin.productList.newProduct}
         </button>
       </div>
 
       {/* Products list */}
       {products.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
-          <p className="text-gray-400 mb-4">Nenhum produto cadastrado.</p>
+          <p className="text-gray-400 mb-4">{admin.productList.empty}</p>
           <button
             onClick={() => setShowNewForm(true)}
             className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-colors text-sm"
           >
-            Criar primeiro produto
+            {admin.productList.firstProduct}
           </button>
         </div>
       ) : (
@@ -193,7 +194,7 @@ export default function ProductList({ token }) {
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                     <span className="text-indigo-700 font-bold text-sm">{formatPrice(product.price)}</span>
                     <span className="text-gray-400 text-xs">{product.category}</span>
-                    <span className="text-gray-400 text-xs">Estoque: {product.stock}</span>
+                    <span className="text-gray-400 text-xs">{admin.productList.stockLabel}: {product.stock}</span>
                   </div>
                 </div>
 
@@ -203,7 +204,7 @@ export default function ProductList({ token }) {
                   <button
                     onClick={() => handleToggleActive(product.id)}
                     disabled={togglingId === product.id}
-                    title={product.active ? 'Desativar' : 'Ativar'}
+                    title={product.active ? admin.productList.statusInactive : admin.productList.statusActive}
                     className={`p-2 rounded-lg transition-colors text-xs font-medium ${
                       product.active
                         ? 'text-green-600 hover:bg-green-50'
@@ -263,7 +264,6 @@ export default function ProductList({ token }) {
       {showNewForm && (
         <ProductForm
           product={null}
-          token={token}
           onClose={() => setShowNewForm(false)}
           onSaved={handleSaved}
         />
@@ -271,7 +271,6 @@ export default function ProductList({ token }) {
       {editingProduct && (
         <ProductForm
           product={editingProduct}
-          token={token}
           onClose={() => setEditingProduct(null)}
           onSaved={handleSaved}
         />

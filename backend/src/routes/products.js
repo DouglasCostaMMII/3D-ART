@@ -7,19 +7,61 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
+const VALID_CATEGORIES = ['Decoração', 'Miniaturas', 'Utilidades', 'Arte', 'Personalizado', 'Outro'];
+
+function validateProduct({ name, price, stock, category }) {
+  if (!name || typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 200) {
+    return 'Nome deve ter entre 2 e 200 caracteres.';
+  }
+  const parsedPrice = parseFloat(price);
+  if (isNaN(parsedPrice) || parsedPrice < 0 || parsedPrice > 999999) {
+    return 'Preço inválido (deve ser entre 0 e 999999).';
+  }
+  if (stock !== undefined) {
+    const parsedStock = parseInt(stock);
+    if (isNaN(parsedStock) || parsedStock < 0 || parsedStock > 99999) {
+      return 'Estoque inválido (deve ser entre 0 e 99999).';
+    }
+  }
+  if (category && !VALID_CATEGORIES.includes(category)) {
+    return `Categoria inválida. Use: ${VALID_CATEGORIES.join(', ')}.`;
+  }
+  return null;
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads')),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
 });
 
+const ALLOWED_EXTENSIONS = /\.(jpe?g|png|gif|webp|bmp|tiff?|heic|heif|avif)$/i;
+
 const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif|webp/;
-  if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+  const extOk = ALLOWED_EXTENSIONS.test(path.extname(file.originalname));
+  const mimeOk = file.mimetype.startsWith('image/');
+  if (extOk || mimeOk) {
     cb(null, true);
   } else {
     cb(new Error('Apenas imagens são permitidas.'));
   }
 };
+
+function uploadMiddleware(req, res, next) {
+  upload.array('images', 5)(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      const msg = err.code === 'LIMIT_FILE_SIZE'
+        ? 'Cada imagem deve ter no máximo 10MB.'
+        : err.code === 'LIMIT_FILE_COUNT'
+        ? 'Máximo de 5 imagens por produto.'
+        : 'Erro no upload das imagens.';
+      return res.status(400).json({ success: false, message: msg });
+    }
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+}
 
 const upload = multer({ storage, fileFilter, limits: { files: 5, fileSize: 10 * 1024 * 1024 } });
 
@@ -79,8 +121,9 @@ router.get('/:id', async (req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, description, price, category, active = 1, stock = 1, variations = [] } = req.body;
-    if (!name || price === undefined) {
-      return res.status(400).json({ success: false, message: 'Nome e preço são obrigatórios.' });
+    const validationError = validateProduct({ name, price, stock, category });
+    if (validationError) {
+      return res.status(400).json({ success: false, message: validationError });
     }
     const id = uuidv4();
     await pool.query(
@@ -112,6 +155,17 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ success: false, message: 'Produto não encontrado.' });
     const existing = rows[0];
     const { name, description, price, category, active, stock, variations } = req.body;
+    if (name !== undefined || price !== undefined) {
+      const validationError = validateProduct({
+        name: name ?? existing.name,
+        price: price ?? existing.price,
+        stock: stock ?? existing.stock,
+        category: category ?? existing.category,
+      });
+      if (validationError) {
+        return res.status(400).json({ success: false, message: validationError });
+      }
+    }
     await pool.query(
       `UPDATE products SET name=$1, description=$2, price=$3, category=$4, active=$5, stock=$6, updated_at=NOW() WHERE id=$7`,
       [
@@ -175,7 +229,7 @@ router.put('/:id/toggle-active', authMiddleware, async (req, res) => {
 });
 
 // POST /api/products/:id/images
-router.post('/:id/images', authMiddleware, upload.array('images', 5), async (req, res) => {
+router.post('/:id/images', authMiddleware, uploadMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { rows } = await pool.query('SELECT id FROM products WHERE id = $1', [id]);

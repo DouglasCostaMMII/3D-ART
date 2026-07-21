@@ -2,27 +2,21 @@ import { API_URL } from '../lib/api'
 import { useState, useEffect } from 'react'
 import IsoCube from '../components/IsoCube'
 import ProductList from '../components/admin/ProductList'
+import { brand, admin } from '../config/content'
 
 export default function Admin() {
-  const [token, setToken] = useState(() => localStorage.getItem('adminToken') || null)
+  const [authenticated, setAuthenticated] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
   const [loginLoading, setLoginLoading] = useState(false)
   const [loginError, setLoginError] = useState(null)
   const [activeTab, setActiveTab] = useState('produtos')
 
-  // Validate token on mount
   useEffect(() => {
-    if (token) {
-      // Try a quick auth check
-      fetch(`${API_URL}/api/products/all`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => {
-        if (res.status === 401) {
-          localStorage.removeItem('adminToken')
-          setToken(null)
-        }
-      }).catch(() => {})
-    }
+    fetch(`${API_URL}/api/auth/check`, { credentials: 'include' })
+      .then((res) => setAuthenticated(res.ok))
+      .catch(() => setAuthenticated(false))
+      .finally(() => setCheckingAuth(false))
   }, [])
 
   async function handleLogin(e) {
@@ -34,6 +28,7 @@ export default function Admin() {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(loginForm),
       })
 
@@ -43,8 +38,7 @@ export default function Admin() {
         throw new Error(data.message || 'Credenciais inválidas.')
       }
 
-      localStorage.setItem('adminToken', data.token)
-      setToken(data.token)
+      setAuthenticated(true)
     } catch (err) {
       setLoginError(err.message)
     } finally {
@@ -52,13 +46,24 @@ export default function Admin() {
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem('adminToken')
-    setToken(null)
+  async function handleLogout() {
+    await fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+    setAuthenticated(false)
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center">
+        <svg className="w-8 h-8 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
+    )
   }
 
   // LOGIN FORM
-  if (!token) {
+  if (!authenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
@@ -66,12 +71,12 @@ export default function Admin() {
           <div className="flex items-center justify-center gap-3 mb-8">
             <IsoCube size={48} />
             <div className="text-center">
-              <h1 className="text-indigo-700 font-extrabold text-2xl tracking-tight">3D Studio</h1>
-              <p className="text-cyan-500 text-sm font-medium">Painel Administrativo</p>
+              <h1 className="text-indigo-700 font-extrabold text-2xl tracking-tight">{brand.name}</h1>
+              <p className="text-cyan-500 text-sm font-medium">{admin.panel}</p>
             </div>
           </div>
 
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Entrar</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">{admin.login.title}</h2>
 
           {loginError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-5">
@@ -81,25 +86,25 @@ export default function Admin() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Usuário</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{admin.login.usernameLabel}</label>
               <input
                 type="text"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
                 required
-                placeholder="Nome de usuário"
+                placeholder={admin.login.usernamePlaceholder}
                 autoComplete="username"
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Senha</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{admin.login.passwordLabel}</label>
               <input
                 type="password"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
                 required
-                placeholder="••••••••"
+                placeholder={admin.login.passwordPlaceholder}
                 autoComplete="current-password"
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
               />
@@ -116,13 +121,13 @@ export default function Admin() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              {loginLoading ? 'Entrando...' : 'Entrar'}
+              {loginLoading ? admin.login.submitLoading : admin.login.submitIdle}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <a href="/" className="text-sm text-indigo-500 hover:text-indigo-700">
-              ← Voltar à loja
+              {admin.login.backToStore}
             </a>
           </div>
         </div>
@@ -140,8 +145,8 @@ export default function Admin() {
             <div className="flex items-center gap-3">
               <IsoCube size={32} />
               <div>
-                <p className="font-bold text-indigo-700 text-sm sm:text-base leading-none">3D Studio</p>
-                <p className="text-cyan-500 text-xs font-medium">Painel Admin</p>
+                <p className="font-bold text-indigo-700 text-sm sm:text-base leading-none">{brand.name}</p>
+                <p className="text-cyan-500 text-xs font-medium">{admin.panelShort}</p>
               </div>
             </div>
 
@@ -153,7 +158,7 @@ export default function Admin() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
-                Ver loja
+                {admin.header.viewStore}
               </a>
               <button
                 onClick={handleLogout}
@@ -162,7 +167,7 @@ export default function Admin() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                Sair
+                {admin.header.logout}
               </button>
             </div>
           </div>
@@ -180,12 +185,12 @@ export default function Admin() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Produtos
+            {admin.tabs.products}
           </button>
         </div>
 
         {/* Tab content */}
-        {activeTab === 'produtos' && <ProductList token={token} />}
+        {activeTab === 'produtos' && <ProductList />}
       </main>
     </div>
   )

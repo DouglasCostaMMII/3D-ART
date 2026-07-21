@@ -1,19 +1,37 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
-router.post('/login', (req, res) => {
-  const { username, password } = req.body;
+const COOKIE_NAME = 'adminToken';
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 24 * 60 * 60 * 1000, // 24h
+  path: '/',
+};
 
-  const adminUsername = process.env.ADMIN_USERNAME;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+router.post('/login', async (req, res) => {
+  const { username, password } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios.' });
   }
 
-  if (username !== adminUsername || password !== adminPassword) {
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+
+  if (!adminPasswordHash) {
+    console.error('ADMIN_PASSWORD_HASH not set in environment');
+    return res.status(500).json({ success: false, message: 'Erro de configuração do servidor.' });
+  }
+
+  const usernameMatch = username === adminUsername;
+  const passwordMatch = await bcrypt.compare(password, adminPasswordHash);
+
+  if (!usernameMatch || !passwordMatch) {
     return res.status(401).json({ success: false, message: 'Credenciais inválidas.' });
   }
 
@@ -23,7 +41,25 @@ router.post('/login', (req, res) => {
     { expiresIn: '24h' }
   );
 
-  return res.json({ success: true, token });
+  res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+  return res.json({ success: true });
+});
+
+router.post('/logout', (req, res) => {
+  res.clearCookie(COOKIE_NAME, { path: '/' });
+  return res.json({ success: true });
+});
+
+router.get('/check', (req, res) => {
+  const token = req.cookies?.[COOKIE_NAME];
+  if (!token) return res.status(401).json({ success: false });
+  try {
+    jwt.verify(token, process.env.JWT_SECRET);
+    return res.json({ success: true });
+  } catch {
+    res.clearCookie(COOKIE_NAME, { path: '/' });
+    return res.status(401).json({ success: false });
+  }
 });
 
 module.exports = router;

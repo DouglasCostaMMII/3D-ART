@@ -1,5 +1,6 @@
 import { useCart } from '../context/CartContext'
 import IsoCube from './IsoCube'
+import { brand, header } from '../config/content'
 
 export default function Header() {
   const { totalItems, openCart } = useCart()
@@ -13,10 +14,10 @@ export default function Header() {
             <IsoCube size={36} className="flex-shrink-0 group-hover:scale-105 transition-transform duration-200" />
             <div className="flex flex-col leading-tight">
               <span className="font-bold text-indigo-600 text-base sm:text-lg tracking-tight">
-                3D Studio
+                {brand.name}
               </span>
               <span className="text-cyan-500 text-xs sm:text-sm font-medium -mt-0.5">
-                Impressões
+                {brand.tagline}
               </span>
             </div>
           </a>
@@ -25,14 +26,14 @@ export default function Header() {
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Tagline - hidden on very small screens */}
             <span className="hidden md:block text-gray-400 text-sm">
-              Impressão 3D sob demanda
+              {header.tagline}
             </span>
 
             {/* Cart button */}
             <button
               onClick={openCart}
               className="relative flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-3 py-2 sm:px-4 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
-              aria-label={`Carrinho com ${totalItems} itens`}
+              aria-label={header.cartAriaLabel(totalItems)}
             >
               {/* Shopping bag icon */}
               <svg
@@ -49,7 +50,7 @@ export default function Header() {
                   d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                 />
               </svg>
-              <span className="hidden sm:inline text-sm font-medium">Carrinho</span>
+              <span className="hidden sm:inline text-sm font-medium">{header.cartButton}</span>
               {totalItems > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-cyan-400 text-indigo-900 text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow">
                   {totalItems > 99 ? '99+' : totalItems}

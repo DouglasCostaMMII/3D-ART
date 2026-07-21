@@ -6,8 +6,8 @@ export default defineConfig({
   base: '/',
   server: {
     proxy: {
-      '/api': 'http://localhost:3001',
-      '/uploads': 'http://localhost:3001',
+      '/api': { target: 'http://localhost:3001', changeOrigin: true, cookieDomainRewrite: 'localhost' },
+      '/uploads': { target: 'http://localhost:3001', changeOrigin: true },
     },
   },
 })

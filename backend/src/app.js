@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
@@ -32,8 +34,17 @@ app.use(
   })
 );
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10,
+  message: { success: false, message: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -44,7 +55,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api/products', productRoutes);
 
 // 404 handler

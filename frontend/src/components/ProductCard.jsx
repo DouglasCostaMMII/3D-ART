@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useCart } from '../context/CartContext'
+import { products as productContent } from '../config/content'
 
 function formatPrice(price) {
   return `R$ ${price.toFixed(2).replace('.', ',')}`
@@ -61,11 +62,7 @@ export default function ProductCard({ product }) {
     setTimeout(() => setAdded(false), 1500)
   }
 
-  const typeLabel = {
-    cor: 'Cor',
-    tamanho: 'Tamanho',
-    material: 'Material',
-  }
+  const typeLabel = productContent.variationLabels
 
   return (
     <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col group">
@@ -90,7 +87,7 @@ export default function ProductCard({ product }) {
         {product.stock === 0 && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <span className="bg-white text-gray-800 font-bold text-sm px-3 py-1.5 rounded-lg shadow">
-              Esgotado
+              {productContent.outOfStock}
             </span>
           </div>
         )}
@@ -177,7 +174,7 @@ export default function ProductCard({ product }) {
             }`}
             aria-label={`Adicionar ${product.name} ao carrinho`}
           >
-            {product.stock === 0 ? 'Esgotado' : added ? 'Adicionado!' : 'Adicionar ao carrinho'}
+            {product.stock === 0 ? productContent.outOfStock : added ? productContent.added : productContent.addToCart}
           </button>
         </div>
       </div>

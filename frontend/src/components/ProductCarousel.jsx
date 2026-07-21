@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { API_URL } from '../lib/api'
 import { useCart } from '../context/CartContext'
+import { carousel, products as productContent } from '../config/content'
 
 function formatPrice(price) {
   return `R$ ${price.toFixed(2).replace('.', ',')}`
@@ -99,13 +100,13 @@ export default function ProductCarousel() {
     <section className="py-6 bg-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-gray-900">Destaques</h2>
+          <h2 className="text-base sm:text-lg font-bold text-gray-900">{carousel.sectionTitle}</h2>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => { prev(); setIsPaused(true); setTimeout(() => setIsPaused(false), 4000) }}
             className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-            aria-label="Anterior"
+            aria-label={carousel.prevLabel}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -114,7 +115,7 @@ export default function ProductCarousel() {
           <button
             onClick={() => { next(); setIsPaused(true); setTimeout(() => setIsPaused(false), 4000) }}
             className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-            aria-label="Próximo"
+            aria-label={carousel.nextLabel}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -160,7 +161,7 @@ export default function ProductCarousel() {
                   />
                   {product.stock === 0 && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                      <span className="bg-white text-gray-700 text-xs font-bold px-3 py-1 rounded-full">Esgotado</span>
+                      <span className="bg-white text-gray-700 text-xs font-bold px-3 py-1 rounded-full">{productContent.outOfStock}</span>
                     </div>
                   )}
                   {product.category && (
@@ -207,7 +208,7 @@ export default function ProductCarousel() {
                 ? 'w-5 h-2 bg-indigo-600'
                 : 'w-2 h-2 bg-gray-200 hover:bg-gray-300'
             }`}
-            aria-label={`Ir para produto ${i + 1}`}
+            aria-label={carousel.dotLabel(i)}
           />
         ))}
       </div>
