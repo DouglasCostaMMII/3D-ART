@@ -5,10 +5,11 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 const COOKIE_NAME = 'adminToken';
+const isProd = process.env.NODE_ENV === 'production';
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
+  sameSite: isProd ? 'none' : 'lax',
+  secure: isProd,
   maxAge: 24 * 60 * 60 * 1000, // 24h
   path: '/',
 };
