@@ -4,6 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../db/database');
 const authMiddleware = require('../middleware/auth');
+const { uploadImage, deleteImage } = require('../lib/supabase');
 
 const router = express.Router();
 
@@ -29,11 +30,6 @@ function validateProduct({ name, price, stock, category }) {
   return null;
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads')),
-  filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
-});
-
 const ALLOWED_EXTENSIONS = /\.(jpe?g|png|gif|webp|bmp|tiff?|heic|heif|avif)$/i;
 
 const fileFilter = (req, file, cb) => {
@@ -45,6 +41,9 @@ const fileFilter = (req, file, cb) => {
     cb(new Error('Apenas imagens são permitidas.'));
   }
 };
+
+// Store in memory so we can stream to Supabase Storage
+const upload = multer({ storage: multer.memoryStorage(), fileFilter, limits: { files: 5, fileSize: 10 * 1024 * 1024 } });
 
 function uploadMiddleware(req, res, next) {
   upload.array('images', 5)(req, res, (err) => {
@@ -62,8 +61,6 @@ function uploadMiddleware(req, res, next) {
     next();
   });
 }
-
-const upload = multer({ storage, fileFilter, limits: { files: 5, fileSize: 10 * 1024 * 1024 } });
 
 async function getProductWithDetails(id) {
   const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
@@ -241,7 +238,9 @@ router.post('/:id/images', authMiddleware, uploadMiddleware, async (req, res) =>
     const newImages = [];
     for (const [index, file] of req.files.entries()) {
       const imageId = uuidv4();
-      const url = `/uploads/${file.filename}`;
+      const ext = path.extname(file.originalname) || '.jpg';
+      const filename = `${imageId}${ext}`;
+      const url = await uploadImage(file.buffer, filename, file.mimetype);
       const isPrimary = parseInt(existing[0].cnt) === 0 && index === 0 ? 1 : 0;
       await pool.query(
         `INSERT INTO product_images (id, product_id, url, is_primary) VALUES ($1,$2,$3,$4)`,
@@ -263,6 +262,7 @@ router.delete('/:id/images/:imageId', authMiddleware, async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM product_images WHERE id = $1 AND product_id = $2', [imageId, id]);
     if (!rows[0]) return res.status(404).json({ success: false, message: 'Imagem não encontrada.' });
     await pool.query('DELETE FROM product_images WHERE id = $1', [imageId]);
+    await deleteImage(rows[0].url).catch(() => {}); // best-effort, don't fail if already gone
     if (rows[0].is_primary === 1) {
       const { rows: first } = await pool.query('SELECT id FROM product_images WHERE product_id = $1 LIMIT 1', [id]);
       if (first[0]) {
