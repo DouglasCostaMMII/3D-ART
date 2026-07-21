@@ -1,66 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
 import { brand, contact } from '../config/content'
 
-function DoomEmbed() {
-  const [focused, setFocused] = useState(false)
-  const containerRef = useRef(null)
-  const iframeRef = useRef(null)
-
-  // Bloqueia scroll da página enquanto mouse está sobre o jogo
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    function blockScroll(e) { e.preventDefault() }
-    el.addEventListener('wheel', blockScroll, { passive: false })
-    el.addEventListener('touchmove', blockScroll, { passive: false })
-    return () => {
-      el.removeEventListener('wheel', blockScroll)
-      el.removeEventListener('touchmove', blockScroll)
-    }
-  }, [])
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative rounded-2xl shadow-2xl border border-white/10 bg-black"
-      style={{ height: 420, overflow: 'hidden' }}
-    >
-      {/* iframe maior e deslocado pra cima para clipar o texto da página original */}
-      <iframe
-        ref={iframeRef}
-        src="https://diekmann.github.io/wasm-fizzbuzz/doom/"
-        title="DOOM"
-        frameBorder="0"
-        allow="autoplay; fullscreen"
-        allowFullScreen
-        style={{
-          position: 'absolute',
-          top: -220,
-          left: 0,
-          width: '100%',
-          height: 700,
-          border: 'none',
-          background: '#000',
-        }}
-      />
-
-      {/* Overlay "Clique para jogar" */}
-      {!focused && (
-        <div
-          className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 cursor-pointer select-none z-10"
-          onClick={() => { setFocused(true); iframeRef.current?.focus() }}
-        >
-          <span className="text-4xl mb-3">🎮</span>
-          <p className="text-white font-bold text-lg">Clique para jogar</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function Maintenance() {
-  const [doomStarted, setDoomStarted] = useState(false)
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-indigo-900 to-indigo-800 flex flex-col items-center justify-center px-4 py-10 text-center">
       {/* Icon */}
@@ -95,36 +35,7 @@ export default function Maintenance() {
         Fale conosco
       </a>
 
-      {/* Doom section */}
-      <div className="mt-12 w-full max-w-2xl pb-4">
-        <p className="text-indigo-400 text-xs mb-3 uppercase tracking-widest font-semibold">
-          enquanto isso, que tal matar uns demônios?
-        </p>
-
-        {!doomStarted ? (
-          <button
-            onClick={() => setDoomStarted(true)}
-            className="inline-flex items-center gap-3 bg-red-700 hover:bg-red-600 text-white font-bold px-8 py-4 rounded-xl transition-all duration-200 text-lg shadow-lg hover:scale-105 active:scale-95"
-          >
-            <span className="text-2xl">💀</span>
-            Jogar DOOM
-            <span className="text-2xl">🔫</span>
-          </button>
-        ) : (
-          <>
-            <DoomEmbed />
-            <div className="mt-3 flex flex-wrap justify-center gap-2 text-xs text-indigo-300">
-              <span className="bg-white/10 rounded-lg px-3 py-1.5">⬆⬇⬅➡ Mover</span>
-              <span className="bg-white/10 rounded-lg px-3 py-1.5">Ctrl Atirar</span>
-              <span className="bg-white/10 rounded-lg px-3 py-1.5">Espaço Abrir portas</span>
-              <span className="bg-white/10 rounded-lg px-3 py-1.5">Alt + ⬅➡ Strafe</span>
-              <span className="bg-white/10 rounded-lg px-3 py-1.5">↵ Enter Iniciar</span>
-            </div>
-          </>
-        )}
-      </div>
-
-      <p className="mt-6 mb-2 text-indigo-700 text-xs">
+      <p className="mt-10 mb-2 text-indigo-700 text-xs">
         © {new Date().getFullYear()} {brand.name}
       </p>
     </div>
