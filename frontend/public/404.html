@@ -5,12 +5,12 @@
     <title>3D Atelie - Impressões</title>
     <script>
       // SPA redirect for GitHub Pages
-      // Converts the path to a query param so index.html can restore it
       var l = window.location;
+      var isGithubPages = l.hostname.endsWith('.github.io');
+      var base = isGithubPages ? l.pathname.split('/').slice(0, 2).join('/') : '';
       l.replace(
         l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        l.pathname.split('/').slice(0, 2).join('/') +
-        '/?p=' + encodeURIComponent(l.pathname.slice(1) + (l.search ? l.search : '') + l.hash)
+        base + '/?p=' + encodeURIComponent(l.pathname.slice(1) + (l.search ? l.search : '') + l.hash)
       );
     </script>
   </head>
