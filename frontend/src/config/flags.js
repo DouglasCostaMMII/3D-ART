@@ -4,4 +4,4 @@
 
 // Coloque true para exibir a tela "Em construção" para visitantes.
 // O painel /admin continua acessível normalmente.
-export const maintenanceMode = true
+export const maintenanceMode = false

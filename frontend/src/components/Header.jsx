@@ -1,9 +1,11 @@
+import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import IsoCube from './IsoCube'
 import { brand, header } from '../config/content'
 
 export default function Header() {
   const { totalItems, openCart } = useCart()
+  const navigate = useNavigate()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b border-gray-100">
@@ -22,12 +24,42 @@ export default function Header() {
             </div>
           </a>
 
+          {/* Nav links */}
+          <nav className="hidden md:flex items-center gap-1" aria-label="Navegação principal">
+            {header.navLinks.map((link) =>
+              link.type === 'route' ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors duration-150"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    const id = link.href.replace('#', '')
+                    const el = document.getElementById(id)
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth' })
+                    } else {
+                      navigate('/')
+                      setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 100)
+                    }
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors duration-150"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
+          </nav>
+
           {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Tagline - hidden on very small screens */}
-            <span className="hidden md:block text-gray-400 text-sm">
-              {header.tagline}
-            </span>
 
             {/* Cart button */}
             <button
