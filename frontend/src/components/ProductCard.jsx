@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useCart } from '../context/CartContext'
 import { products as productContent } from '../config/content'
+import { API_URL } from '../lib/api'
 
 function formatPrice(price) {
   return `R$ ${price.toFixed(2).replace('.', ',')}`
@@ -32,8 +33,9 @@ export default function ProductCard({ product }) {
     if (!product.images || product.images.length === 0) {
       return `https://placehold.co/400x400/4f46e5/ffffff?text=${encodeURIComponent(product.name)}`
     }
-    const primary = product.images.find((img) => img.is_primary === 1)
-    return primary ? primary.url : product.images[0].url
+    const primary = product.images.find((img) => img.is_primary === 1) || product.images[0]
+    const url = primary.url
+    return url.startsWith('http') ? url : `${API_URL}${url}`
   }, [product.images, product.name])
 
   // Group variations by type
@@ -74,6 +76,7 @@ export default function ProductCard({ product }) {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
           onError={(e) => {
+            e.target.onerror = null
             e.target.src = `https://placehold.co/400x400/4f46e5/ffffff?text=${encodeURIComponent(product.name)}`
           }}
         />
