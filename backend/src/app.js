@@ -17,6 +17,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
   'https://douglascostammii.github.io',
+  'https://3datelie.com.br',
+  'https://www.3datelie.com.br',
 ].filter(Boolean);
 
 app.use(
