@@ -5,7 +5,7 @@
 
 // --- Marca ---------------------------------------------------
 export const brand = {
-  name: '3D Atelie',
+  name: '3D Ateliê',
   tagline: 'Impressões',
   description: 'Impressão 3D sob demanda',
   fullDescription:
